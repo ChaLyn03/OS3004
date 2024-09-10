@@ -4,6 +4,8 @@ from lrummu import LruMMU
 from randmmu import RandMMU
 
 import sys
+import os
+import psutil  # To track memory usage
 from enum import Enum
 from dataclasses import dataclass
 from functools import cache
@@ -14,6 +16,7 @@ mmu_labels = [
     (RandMMU, "rand"),
     (MMU, "undefined")
 ]
+
 @cache
 def name_of_mmu(mmu):
     for (mmu_type, label) in mmu_labels:
@@ -65,6 +68,11 @@ class SimulationFactory:
                             debug
                         )
 
+def get_memory_usage():
+    """Get current memory usage of the process in KB."""
+    process = psutil.Process(os.getpid())
+    return process.memory_info().rss // 1024  # in KB
+
 def simulate(sim: SimulationParameters):
     filename = f"{sim.trace_file.value}.trace"
     try:
@@ -78,12 +86,12 @@ def simulate(sim: SimulationParameters):
     frames = sim.frames
     mmu = sim.replacement_mode.value(frames)
     no_events = 0
+    peak_memory = get_memory_usage()  # Initialize peak memory tracking
 
     for trace_line in trace_contents:
         trace_cmd = trace_line.strip().split(" ")
         logical_address = int(trace_cmd[0], 16)
-        page_number = logical_address >>  PAGE_OFFSET
-
+        page_number = logical_address >> PAGE_OFFSET
 
         # Process read or write
         if trace_cmd[1] == "R":
@@ -94,16 +102,21 @@ def simulate(sim: SimulationParameters):
             print(f"Badly formatted file. Error on line {no_events + 1}")
             return
 
+        # Track peak memory usage after each memory operation
+        current_memory = get_memory_usage()
+        if current_memory > peak_memory:
+            peak_memory = current_memory
+
         no_events += 1
 
-    # TODO: Print results
     fault_rate = mmu.get_total_page_faults() / no_events
-    print(f"{filename:<14}|{name_of_mmu(mmu):<8}|{frames: 8d}|{no_events: 8d}|{mmu.get_total_disk_reads(): 7d} reads|{mmu.get_total_disk_writes(): 7d} writes|{fault_rate: .3%}")
-    return f"{filename},{name_of_mmu(mmu)},{frames},{no_events},{mmu.get_total_disk_reads()},{mmu.get_total_disk_writes()},{fault_rate}\r\n"
+
+    print(f"{filename:<14}|{name_of_mmu(mmu):<8}|{frames: 8d}|{no_events: 8d}|{mmu.get_total_disk_reads(): 7d} reads|{mmu.get_total_disk_writes(): 7d}|{fault_rate: .3%}|{peak_memory: 6d} KB used (peak)")
+    
+    return f"{filename},{name_of_mmu(mmu)},{frames},{no_events},{mmu.get_total_disk_reads()},{mmu.get_total_disk_writes()},{fault_rate},{peak_memory}\r\n"
 
 def main():
-    max_exponent = 12 # Results stagnate after exceding page size
-    frame_list = [2 ** x for x in range(0, max_exponent + 1)]
+    frame_list = [2,4,8,16,32]  # Add 16 and 32 frames to the simulation
 
     factory = SimulationFactory(
         [x for x in TraceFile],
@@ -113,10 +126,9 @@ def main():
     )
 
     with open("output.csv", "w") as outfile:
-        outfile.write("trace,mmu,frames,no_events,reads,writes,fault_rate\r\n")
+        outfile.write("trace,mmu,frames,no_events,reads,writes,fault_rate,peak_memory_kb\r\n")
         for sim_params in factory.enumerate():
             outfile.write(simulate(sim_params))
 
 if __name__ == "__main__":
     main()
-                    
