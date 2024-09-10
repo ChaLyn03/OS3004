@@ -1,4 +1,3 @@
-
 from mmu import MMU
 from clockmmu import ClockMMU
 from lrummu import LruMMU
@@ -99,11 +98,11 @@ def simulate(sim: SimulationParameters):
 
     # TODO: Print results
     fault_rate = mmu.get_total_page_faults() / no_events
-    print(f"{filename:<14}|{name_of_mmu(mmu):<8}|{frames: 8d}|{no_events: 8d}|{mmu.get_total_disk_reads(): 7d} reads|{mmu.get_total_disk_writes(): 7d}|{fault_rate: .3%}")
+    print(f"{filename:<14}|{name_of_mmu(mmu):<8}|{frames: 8d}|{no_events: 8d}|{mmu.get_total_disk_reads(): 7d} reads|{mmu.get_total_disk_writes(): 7d} writes|{fault_rate: .3%}")
     return f"{filename},{name_of_mmu(mmu)},{frames},{no_events},{mmu.get_total_disk_reads()},{mmu.get_total_disk_writes()},{fault_rate}\r\n"
 
 def main():
-    max_exponent = 2
+    max_exponent = 12 # Results stagnate after exceding page size
     frame_list = [2 ** x for x in range(0, max_exponent + 1)]
 
     factory = SimulationFactory(
