@@ -27,7 +27,6 @@ def name_of_mmu(mmu):
 class TraceFile(str, Enum):
     BZIP = "bzip"
     GCC = "gcc"
-    SAMPLE = "sample"
     SIXPACK = "sixpack"
     SWIM = "swim"
 
