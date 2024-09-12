@@ -2,8 +2,8 @@ from mmu import MMU
 from clockmmu import ClockMMU
 from lrummu import LruMMU
 from randmmu import RandMMU
+from measurement import thread_timer
 
-import sys
 import os
 import psutil  # To track memory usage
 from enum import Enum
@@ -42,6 +42,17 @@ class DebugMode(int, Enum):
 PAGE_OFFSET = 12  # page is 2^12 = 4KB
 
 @dataclass
+class OutputData:
+    filename: str
+    mmu_name: str
+    frames: int
+    events: int
+    reads: int
+    writes: int
+    fault_rate: float
+    peak_memory: int
+
+@dataclass
 class SimulationParameters:
     trace_file: TraceFile
     frames: int
@@ -68,10 +79,12 @@ class SimulationFactory:
                         )
 
 def get_memory_usage():
+    return 42
     """Get current memory usage of the process in KB."""
     process = psutil.Process(os.getpid())
     return process.memory_info().rss // 1024  # in KB
 
+@thread_timer
 def simulate(sim: SimulationParameters):
     filename = f"{sim.trace_file.value}.trace"
     try:
@@ -108,14 +121,27 @@ def simulate(sim: SimulationParameters):
 
         no_events += 1
 
+    reads = mmu.get_total_disk_reads()
+    writes = mmu.get_total_disk_writes()
     fault_rate = mmu.get_total_page_faults() / no_events
 
-    print(f"{filename:<14}|{name_of_mmu(mmu):<8}|{frames: 8d}|{no_events: 8d}|{mmu.get_total_disk_reads(): 7d} reads|{mmu.get_total_disk_writes(): 7d}|{fault_rate: .3%}|{peak_memory: 6d} KB used (peak)")
+    print(f"{filename:<14}|{name_of_mmu(mmu):<8}|{frames: 8d}|{no_events: 8d}|{mmu.get_total_disk_reads(): 7d} reads|{mmu.get_total_disk_writes(): 7d} writes|{fault_rate: 8.3%}|", end='')
     
-    return f"{filename},{name_of_mmu(mmu)},{frames},{no_events},{mmu.get_total_disk_reads()},{mmu.get_total_disk_writes()},{fault_rate},{peak_memory}\r\n"
+    return OutputData(
+        filename,
+        name_of_mmu(mmu),
+        frames,
+        no_events,
+        reads,
+        writes,
+        fault_rate,
+        peak_memory
+    )
 
 def main():
-    frame_list = [2,4,8,16,32]  # Add 16 and 32 frames to the simulation
+    #frame_list = [2,4,8,16,32]  # Add 16 and 32 frames to the simulation
+    max_exponent = 12
+    frame_list = [2 ** x for x in range(0, max_exponent + 1)]
 
     factory = SimulationFactory(
         [x for x in TraceFile],
@@ -125,9 +151,11 @@ def main():
     )
 
     with open("output.csv", "w") as outfile:
-        outfile.write("trace,mmu,frames,no_events,reads,writes,fault_rate,peak_memory_kb\r\n")
+        outfile.write("trace,mmu,frames,no_events,reads,writes,fault_rate,time_sec\r\n")
         for sim_params in factory.enumerate():
-            outfile.write(simulate(sim_params))
+            (od, delta) = simulate(sim_params)
+            output_line = f"{od.filename},{od.mmu_name},{od.frames},{od.events},{od.reads},{od.writes},{od.fault_rate},{delta}\r\n"
+            outfile.write(output_line)
 
 if __name__ == "__main__":
     main()
