@@ -38,6 +38,14 @@ def plot_fault_rate(subset: pd.DataFrame, label: str, show: bool = False):
             subset2 = subset[subset['trace'] == trace]
             print(subset2.to_string())
             plt.plot(subset2['frames_log'], subset2['fault_rate_log'], marker='o', label=trace)
+    
+    second_level = "mmu" if traces_dep else "trace"
+    drop_it = "trace" if traces_dep else "mmu"
+    subset3 = subset.copy().set_index(keys=['frames', second_level], drop=True).sort_index().drop(columns=[drop_it])
+    mean = subset3.groupby(level=['frames']).mean()
+    mean['fault_rate_log'] = mean['fault_rate'].apply(lambda x: math.log(x, 2))
+    print(mean.to_string())
+    plt.plot(mean['frames_log'], mean['fault_rate_log'], marker='o', label='average')
 
     plt.title(f'Page Fault Rate vs. Number of Frames for {label}')
     plt.xlabel('Number of Frames (log2)')
@@ -45,38 +53,6 @@ def plot_fault_rate(subset: pd.DataFrame, label: str, show: bool = False):
     plt.legend()
     plt.grid(True)
     plt.savefig(f'plots/fault_rate_vs_frames/fault_rate_vs_frames_{"traces" if traces_dep else "mmu"}_{label}.png')
-    if show:
-        plt.show()
-
-def plot_disk_accesses(subset: pd.DataFrame, label: str, show: bool = False):
-    traces = sorted(subset['trace'].unique())
-    mmus = sorted(set(subset['mmu']))
-
-    traces_dep = None
-
-    if len(traces) == 1:
-        traces_dep = True
-    if len(mmus) == 1:
-        traces_dep = False
-
-    plt.figure(figsize=(10, 6))
-    if traces_dep:
-        for mmu in mmus:
-            subset2 = subset[subset['mmu'] == mmu]
-            print(subset2.to_string())
-            plt.plot(subset2['frames_log'], subset2['disk_accesses_log'], marker='o', label=mmu)
-    else:
-        for trace in traces:
-            subset2 = subset[subset['trace'] == trace]
-            print(subset2.to_string())
-            plt.plot(subset2['frames_log'], subset2['disk_accesses_log'], marker='o', label=trace)
-
-    plt.title(f'Disk Accesses (Reads + Writes) vs. Number of Frames for {label}')
-    plt.xlabel('Number of Frames (log2)')
-    plt.ylabel('Disk Accesses (Reads + Writes) (log10)')
-    plt.legend()
-    plt.grid(True)
-    plt.savefig(f'plots/disk_accesses_vs_frames/disk_accesses_vs_frames_{"traces" if traces_dep else "mmu"}_{label}.png')
     if show:
         plt.show()
 
@@ -90,11 +66,12 @@ def plot_thread_time(subset: pd.DataFrame, label: str, show: bool = False):
         traces_dep = True
     if len(mmus) == 1:
         traces_dep = False
+    print(traces_dep, label)
 
     plt.figure(figsize=(10, 6))
     if traces_dep:
         for mmu in mmus:
-            subset2 = subset[subset['mmu'] == mmu]
+            subset2: pd.DataFrame = subset[subset['mmu'] == mmu]
             print(subset2.to_string())
             plt.plot(subset2['frames_log'], subset2['time_sec'], marker='o', label=mmu)
     else:
@@ -102,6 +79,13 @@ def plot_thread_time(subset: pd.DataFrame, label: str, show: bool = False):
             subset2 = subset[subset['trace'] == trace]
             print(subset2.to_string())
             plt.plot(subset2['frames_log'], subset2['time_sec'], marker='o', label=trace)
+    
+    second_level = "mmu" if traces_dep else "trace"
+    drop_it = "trace" if traces_dep else "mmu"
+    subset3 = subset.copy().set_index(keys=['frames', second_level], drop=True).sort_index().drop(columns=[drop_it])
+    mean = subset3.groupby(level=['frames']).mean()
+    print(mean.to_string())
+    plt.plot(mean['frames_log'], mean['time_sec'], marker='o', label='average')
 
     plt.title(f'System Cost vs. Number of Frames for {label}')
     plt.xlabel('Number of Frames (log2)')
