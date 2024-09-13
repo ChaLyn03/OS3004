@@ -80,12 +80,44 @@ def plot_disk_accesses(subset: pd.DataFrame, label: str, show: bool = False):
     if show:
         plt.show()
 
+def plot_thread_time(subset: pd.DataFrame, label: str, show: bool = False):
+    traces = sorted(subset['trace'].unique())
+    mmus = sorted(set(subset['mmu']))
+
+    traces_dep = None
+
+    if len(traces) == 1:
+        traces_dep = True
+    if len(mmus) == 1:
+        traces_dep = False
+
+    plt.figure(figsize=(10, 6))
+    if traces_dep:
+        for mmu in mmus:
+            subset2 = subset[subset['mmu'] == mmu]
+            print(subset2.to_string())
+            plt.plot(subset2['frames_log'], subset2['time_sec'], marker='o', label=mmu)
+    else:
+        for trace in traces:
+            subset2 = subset[subset['trace'] == trace]
+            print(subset2.to_string())
+            plt.plot(subset2['frames_log'], subset2['time_sec'], marker='o', label=trace)
+
+    plt.title(f'System Cost vs. Number of Frames for {label}')
+    plt.xlabel('Number of Frames (log2)')
+    plt.ylabel('Time (sec)')
+    plt.legend()
+    plt.grid(True)
+    plt.savefig(f'plots/time_vs_frames/time_vs_frames_{"traces" if traces_dep else "mmu"}_{label}.png')
+    if show:
+        plt.show()
+
 for algo in df['mmu'].unique():
     subset = df[df['mmu'] == algo]
     plot_fault_rate(subset, label=algo)
-    plot_disk_accesses(subset, label=algo)
+    plot_thread_time(subset, label=algo)
 
 for trace in sorted(df['trace'].unique()):
     subset = df[df['trace'] == trace]
     plot_fault_rate(subset, label=trace)
-    plot_disk_accesses(subset, label=trace)
+    plot_thread_time(subset, label=trace)
